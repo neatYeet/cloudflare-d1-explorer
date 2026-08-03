@@ -1,0 +1,63 @@
+{
+  "name": "d1-explorer",
+  "displayName": "Cloudflare D1 Explorer (phpMyAdmin for D1)",
+  "description": "A powerful phpMyAdmin-style database explorer for local Cloudflare D1 SQLite databases",
+  "version": "1.0.0",
+  "publisher": "antigravity",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other",
+    "Data Science"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "d1-explorer.open",
+        "title": "D1 Explorer: Open Database Manager",
+        "category": "Cloudflare D1"
+      },
+      {
+        "command": "d1-explorer.refresh",
+        "title": "D1 Explorer: Refresh Databases",
+        "category": "Cloudflare D1"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "d1-explorer-container",
+          "title": "D1 Explorer",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "d1-explorer-container": [
+        {
+          "id": "d1-explorer-tree",
+          "name": "Local D1 Databases"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.80.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "sql.js": "^1.12.0"
+  }
+}
