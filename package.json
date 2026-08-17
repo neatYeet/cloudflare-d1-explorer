@@ -1,9 +1,13 @@
 {
   "name": "d1-explorer",
-  "displayName": "Cloudflare D1 Explorer (phpMyAdmin for D1)",
-  "description": "A powerful phpMyAdmin-style database explorer for local Cloudflare D1 SQLite databases",
-  "version": "1.0.0",
+  "displayName": "Cloudflare D1 & R2 Explorer",
+  "description": "A powerful phpMyAdmin & S3-style visual explorer for local Cloudflare D1 databases and R2 storage buckets",
+  "version": "1.1.0",
   "publisher": "antigravity",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/neatYeet/cloudflare-d1-explorer"
+  },
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -19,20 +23,25 @@
     "commands": [
       {
         "command": "d1-explorer.open",
-        "title": "D1 Explorer: Open Database Manager",
-        "category": "Cloudflare D1"
+        "title": "Open D1 Database Manager",
+        "category": "Cloudflare Explorer"
+      },
+      {
+        "command": "d1-explorer.openR2",
+        "title": "Open R2 Bucket Manager",
+        "category": "Cloudflare Explorer"
       },
       {
         "command": "d1-explorer.refresh",
-        "title": "D1 Explorer: Refresh Databases",
-        "category": "Cloudflare D1"
+        "title": "Refresh D1 & R2 Resources",
+        "category": "Cloudflare Explorer"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
           "id": "d1-explorer-container",
-          "title": "D1 Explorer",
+          "title": "Cloudflare Explorer",
           "icon": "resources/icon.svg"
         }
       ]
@@ -41,7 +50,7 @@
       "d1-explorer-container": [
         {
           "id": "d1-explorer-tree",
-          "name": "Local D1 Databases"
+          "name": "Local D1 & R2 Resources"
         }
       ]
     }
