@@ -24,7 +24,7 @@ const copyWasmPlugin = {
 };
 
 async function main() {
-  const ctx = await esbuild.context({
+  const extensionCtx = await esbuild.context({
     entryPoints: ['src/extension.ts'],
     bundle: true,
     format: 'cjs',
@@ -36,13 +36,30 @@ async function main() {
     plugins: [copyWasmPlugin],
   });
 
+  const mcpCtx = await esbuild.context({
+    entryPoints: ['src/mcp.ts'],
+    bundle: true,
+    format: 'cjs',
+    minify: false,
+    sourcemap: true,
+    platform: 'node',
+    outfile: 'dist/mcp.js',
+    banner: {
+      js: '#!/usr/bin/env node\n',
+    },
+    external: ['vscode'],
+  });
+
   if (watch) {
-    await ctx.watch();
-    console.log('Watching for changes...');
+    await extensionCtx.watch();
+    await mcpCtx.watch();
+    console.log('Watching for changes in extension and MCP server...');
   } else {
-    await ctx.rebuild();
-    await ctx.dispose();
-    console.log('Build completed successfully.');
+    await extensionCtx.rebuild();
+    await extensionCtx.dispose();
+    await mcpCtx.rebuild();
+    await mcpCtx.dispose();
+    console.log('Build completed successfully for extension and MCP server.');
   }
 }
 

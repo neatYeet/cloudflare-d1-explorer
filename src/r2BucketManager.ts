@@ -30,11 +30,30 @@ export class R2BucketManager {
   private currentDb: Database | null = null;
   private currentBucketInfo: R2BucketInfo | null = null;
 
-  public static async initialize(extensionPath: string): Promise<void> {
+  public static async initialize(extensionPath?: string): Promise<void> {
     if (!this.SQL) {
-      const wasmPath = path.join(extensionPath, 'dist', 'sql-wasm.wasm');
+      let wasmPath: string | undefined;
+      if (extensionPath) {
+        wasmPath = path.join(extensionPath, 'dist', 'sql-wasm.wasm');
+      } else {
+        const candidates = [
+          path.join(__dirname, 'sql-wasm.wasm'),
+          path.join(__dirname, 'dist', 'sql-wasm.wasm'),
+          path.join(__dirname, '..', 'dist', 'sql-wasm.wasm'),
+          path.join(__dirname, '..', 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
+          path.join(process.cwd(), 'dist', 'sql-wasm.wasm'),
+          path.join(process.cwd(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
+        ];
+        for (const cand of candidates) {
+          if (fs.existsSync(cand)) {
+            wasmPath = cand;
+            break;
+          }
+        }
+      }
+
       this.SQL = await initSqlJs({
-        locateFile: () => wasmPath,
+        locateFile: () => wasmPath || 'sql-wasm.wasm',
       });
     }
   }
@@ -317,18 +336,55 @@ export class R2BucketManager {
     }
   }
 
+  public getObjectContent(
+    key: string,
+    encoding: 'utf-8' | 'base64' = 'utf-8'
+  ): {
+    object: R2ObjectSummary | null;
+    content?: string;
+    size?: number;
+    error?: string;
+  } {
+    const details = this.getObjectDetails(key);
+    if (details.error || !details.object) {
+      return { object: null, error: details.error || 'Object not found' };
+    }
+    if (!details.blobPath || !fs.existsSync(details.blobPath)) {
+      return { object: details.object, error: 'Blob file not found on disk' };
+    }
+    try {
+      const buf = fs.readFileSync(details.blobPath);
+      const content = encoding === 'base64' ? buf.toString('base64') : buf.toString('utf-8');
+      return {
+        object: details.object,
+        content,
+        size: buf.length,
+      };
+    } catch (err: any) {
+      return { object: details.object, error: err?.message || String(err) };
+    }
+  }
+
   public putObject(
     key: string,
-    base64Data: string,
+    data: string | Buffer,
     contentType?: string,
-    customMetadata?: Record<string, string>
+    customMetadata?: Record<string, string>,
+    isBase64: boolean = true
   ): { success: boolean; error?: string } {
     if (!this.currentDb || !this.currentBucketInfo) {
       return { success: false, error: 'No bucket open' };
     }
 
     try {
-      const buffer = Buffer.from(base64Data, 'base64');
+      let buffer: Buffer;
+      if (Buffer.isBuffer(data)) {
+        buffer = data;
+      } else if (isBase64) {
+        buffer = Buffer.from(data, 'base64');
+      } else {
+        buffer = Buffer.from(data, 'utf-8');
+      }
       const mime = contentType || this.guessMimeType(key);
 
       // Ensure blobs directory exists

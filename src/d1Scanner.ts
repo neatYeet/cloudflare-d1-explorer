@@ -1,6 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as vscode from 'vscode';
+
+let vscode: any;
+try {
+  vscode = require('vscode');
+} catch {
+  // Not running inside VS Code extension host
+}
 
 export interface D1DatabaseInfo {
   id: string;
@@ -24,30 +30,47 @@ export interface R2BucketInfo {
 }
 
 export class D1Scanner {
-  public static async scanWorkspace(): Promise<D1DatabaseInfo[]> {
-    const { databases } = await this.scanAll();
+  public static async scanWorkspace(customRoots?: string[]): Promise<D1DatabaseInfo[]> {
+    const { databases } = await this.scanAll(customRoots);
     return databases;
   }
 
-  public static async scanR2Buckets(): Promise<R2BucketInfo[]> {
-    const { r2Buckets } = await this.scanAll();
+  public static async scanR2Buckets(customRoots?: string[]): Promise<R2BucketInfo[]> {
+    const { r2Buckets } = await this.scanAll(customRoots);
     return r2Buckets;
   }
 
-  public static async scanAll(): Promise<{
+  public static async scanAll(customRoots?: string[]): Promise<{
     databases: D1DatabaseInfo[];
     r2Buckets: R2BucketInfo[];
   }> {
     const databases: D1DatabaseInfo[] = [];
     const r2Buckets: R2BucketInfo[] = [];
 
-    // Common search locations: workspace folders and standard project paths
+    // Common search locations: custom roots, workspace folders, cwd, and standard project paths
     const searchRoots: string[] = [];
 
-    if (vscode.workspace.workspaceFolders) {
-      for (const folder of vscode.workspace.workspaceFolders) {
-        searchRoots.push(folder.uri.fsPath);
+    if (customRoots && customRoots.length > 0) {
+      for (const root of customRoots) {
+        const resolved = path.resolve(root);
+        if (fs.existsSync(resolved) && !searchRoots.includes(resolved)) {
+          searchRoots.push(resolved);
+        }
       }
+    }
+
+    if (vscode?.workspace?.workspaceFolders) {
+      for (const folder of vscode.workspace.workspaceFolders) {
+        const folderPath = folder.uri.fsPath;
+        if (!searchRoots.includes(folderPath)) {
+          searchRoots.push(folderPath);
+        }
+      }
+    }
+
+    const cwd = process.cwd();
+    if (fs.existsSync(cwd) && !searchRoots.includes(cwd)) {
+      searchRoots.push(cwd);
     }
 
     // Also include default known project parent if applicable (e.g., c:\project)
@@ -63,6 +86,71 @@ export class D1Scanner {
     }
 
     return { databases, r2Buckets };
+  }
+
+  public static async findDatabase(query: string, customRoots?: string[]): Promise<D1DatabaseInfo | null> {
+    const resolvedPath = path.resolve(query);
+    if (fs.existsSync(resolvedPath) && resolvedPath.endsWith('.sqlite')) {
+      const stats = fs.statSync(resolvedPath);
+      const projectPath = path.dirname(path.dirname(path.dirname(path.dirname(resolvedPath))));
+      return {
+        id: path.basename(resolvedPath),
+        name: path.basename(resolvedPath, '.sqlite'),
+        filePath: resolvedPath,
+        sizeBytes: stats.size,
+        projectPath,
+      };
+    }
+
+    const { databases } = await this.scanAll(customRoots);
+    const qLower = query.toLowerCase().trim();
+
+    // Exact matches
+    const exact = databases.find(
+      (d) =>
+        d.id.toLowerCase() === qLower ||
+        d.name.toLowerCase() === qLower ||
+        d.wranglerBinding?.toLowerCase() === qLower ||
+        path.basename(d.filePath).toLowerCase() === qLower ||
+        d.filePath.toLowerCase() === resolvedPath.toLowerCase()
+    );
+    if (exact) return exact;
+
+    // Partial matches
+    const partial = databases.find(
+      (d) =>
+        d.name.toLowerCase().includes(qLower) ||
+        (d.wranglerBinding && d.wranglerBinding.toLowerCase().includes(qLower)) ||
+        d.id.toLowerCase().includes(qLower)
+    );
+    return partial || null;
+  }
+
+  public static async findR2Bucket(query: string, customRoots?: string[]): Promise<R2BucketInfo | null> {
+    const { r2Buckets } = await this.scanAll(customRoots);
+    const qLower = query.toLowerCase().trim();
+    const resolvedPath = path.resolve(query);
+
+    // Exact matches
+    const exact = r2Buckets.find(
+      (b) =>
+        b.id.toLowerCase() === qLower ||
+        b.bucketName.toLowerCase() === qLower ||
+        b.name.toLowerCase() === qLower ||
+        b.wranglerBinding?.toLowerCase() === qLower ||
+        b.blobsDir.toLowerCase() === resolvedPath.toLowerCase()
+    );
+    if (exact) return exact;
+
+    // Partial matches
+    const partial = r2Buckets.find(
+      (b) =>
+        b.bucketName.toLowerCase().includes(qLower) ||
+        b.name.toLowerCase().includes(qLower) ||
+        (b.wranglerBinding && b.wranglerBinding.toLowerCase().includes(qLower)) ||
+        b.id.toLowerCase().includes(qLower)
+    );
+    return partial || null;
   }
 
   private static scanDirectoryRecursive(

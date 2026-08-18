@@ -48,11 +48,30 @@ export class D1DatabaseManager {
   private currentDb: Database | null = null;
   private currentFilePath: string | null = null;
 
-  public static async initialize(extensionPath: string): Promise<void> {
+  public static async initialize(extensionPath?: string): Promise<void> {
     if (!this.SQL) {
-      const wasmPath = path.join(extensionPath, 'dist', 'sql-wasm.wasm');
+      let wasmPath: string | undefined;
+      if (extensionPath) {
+        wasmPath = path.join(extensionPath, 'dist', 'sql-wasm.wasm');
+      } else {
+        const candidates = [
+          path.join(__dirname, 'sql-wasm.wasm'),
+          path.join(__dirname, 'dist', 'sql-wasm.wasm'),
+          path.join(__dirname, '..', 'dist', 'sql-wasm.wasm'),
+          path.join(__dirname, '..', 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
+          path.join(process.cwd(), 'dist', 'sql-wasm.wasm'),
+          path.join(process.cwd(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
+        ];
+        for (const cand of candidates) {
+          if (fs.existsSync(cand)) {
+            wasmPath = cand;
+            break;
+          }
+        }
+      }
+
       this.SQL = await initSqlJs({
-        locateFile: () => wasmPath,
+        locateFile: () => wasmPath || 'sql-wasm.wasm',
       });
     }
   }
@@ -193,6 +212,31 @@ export class D1DatabaseManager {
     }
 
     return { columns, indexes, foreignKeys, createSql };
+  }
+
+  public getAllTablesStructure(): Record<
+    string,
+    {
+      columns: ColumnInfo[];
+      indexes: IndexInfo[];
+      foreignKeys: ForeignKeyInfo[];
+      createSql: string;
+    }
+  > {
+    const tables = this.getTables();
+    const result: Record<
+      string,
+      {
+        columns: ColumnInfo[];
+        indexes: IndexInfo[];
+        foreignKeys: ForeignKeyInfo[];
+        createSql: string;
+      }
+    > = {};
+    for (const t of tables) {
+      result[t.name] = this.getTableStructure(t.name);
+    }
+    return result;
   }
 
   public getTableData(

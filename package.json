@@ -19,6 +19,9 @@
     "onStartupFinished"
   ],
   "main": "./dist/extension.js",
+  "bin": {
+    "d1-explorer-mcp": "./dist/mcp.js"
+  },
   "contributes": {
     "commands": [
       {
@@ -58,15 +61,19 @@
   "scripts": {
     "vscode:prepublish": "npm run build",
     "build": "node esbuild.js",
-    "watch": "node esbuild.js --watch"
+    "watch": "node esbuild.js --watch",
+    "mcp": "node dist/mcp.js"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/sql.js": "^1.4.11",
     "@types/vscode": "^1.80.0",
     "esbuild": "^0.20.0",
     "typescript": "^5.3.0"
   },
   "dependencies": {
-    "sql.js": "^1.12.0"
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "sql.js": "^1.12.0",
+    "zod": "^4.4.3"
   }
 }
