@@ -43,7 +43,9 @@ pnpm run mcp
   - *Parameters*: `database` (database name, binding, ID, or path), `search_root` (optional string)
 - `d1_get_schema`: Get table schema structure, column definitions, data types, indexes, foreign keys, and CREATE TABLE SQL.
   - *Parameters*: `database` (string), `table` (optional string), `search_root` (optional string)
-- `d1_execute_query`: Execute any SQL query (`SELECT`, `INSERT`, `UPDATE`, `DELETE`, `CREATE`, etc.). Write queries automatically persist changes to disk.
+- `d1_select_query` (Read-Only): Execute read-only SQL queries (`SELECT`, `EXPLAIN`, `PRAGMA`). Mutation queries are blocked.
+  - *Parameters*: `database` (string), `sql` (string), `search_root` (optional string)
+- `d1_write_query` (Mutations): Execute write / mutation SQL statements (`INSERT`, `UPDATE`, `DELETE`, `CREATE`, `ALTER`, `DROP`, `REPLACE`).
   - *Parameters*: `database` (string), `sql` (string), `search_root` (optional string)
 - `d1_export_dump`: Export a complete SQL dump (schema DDL and INSERT statements) for a database or specific table.
   - *Parameters*: `database` (string), `table` (optional string), `search_root` (optional string)

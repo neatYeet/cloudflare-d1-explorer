@@ -170,19 +170,36 @@ async function main() {
     }
   );
 
-  // D1 Tool: Execute Query
+  // D1 Tool: Select Query (Read-Only)
   server.tool(
-    'd1_execute_query',
-    'Execute a SQL query (SELECT, INSERT, UPDATE, DELETE, CREATE, etc.) against a local Cloudflare D1 database. Write queries automatically persist changes to disk.',
+    'd1_select_query',
+    'Execute a read-only SQL query (SELECT, EXPLAIN, PRAGMA) against a local Cloudflare D1 database. Write mutations (INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, etc.) are blocked.',
     {
       database: z
         .string()
         .describe('Database identifier: database name, binding name, ID, or direct SQLite file path'),
-      sql: z.string().describe('The SQL query statement to execute'),
+      sql: z.string().describe('The read-only SQL query statement to execute (SELECT, EXPLAIN, PRAGMA)'),
       search_root: z.string().optional().describe('Optional search root directory to resolve database'),
     },
     async ({ database, sql, search_root }) => {
       try {
+        const trimmed = sql.trim();
+        // Check for mutation keywords
+        if (
+          !/^\s*(SELECT|EXPLAIN|PRAGMA|WITH)\b/i.test(trimmed) ||
+          /\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|REPLACE|VACUUM|ATTACH|DETACH)\b/i.test(trimmed)
+        ) {
+          return {
+            isError: true,
+            content: [
+              {
+                type: 'text',
+                text: 'Blocked: d1_select_query only allows read-only queries (SELECT, EXPLAIN, PRAGMA). For database mutations (INSERT, UPDATE, DELETE, CREATE, DROP, ALTER), use the d1_write_query tool instead.',
+              },
+            ],
+          };
+        }
+
         const roots = search_root ? [search_root] : undefined;
         const dbInfo = await D1Scanner.findDatabase(database, roots);
         if (!dbInfo) {
@@ -227,7 +244,6 @@ async function main() {
                   columns: result.columns,
                   rowCount: result.values.length,
                   rows: result.values,
-                  rowsAffected: result.rowsAffected,
                   executionTimeMs: result.executionTimeMs,
                 },
                 null,
@@ -239,7 +255,81 @@ async function main() {
       } catch (err: any) {
         return {
           isError: true,
-          content: [{ type: 'text', text: `Error executing query: ${err?.message || String(err)}` }],
+          content: [{ type: 'text', text: `Error executing select query: ${err?.message || String(err)}` }],
+        };
+      }
+    }
+  );
+
+  // D1 Tool: Write Query (Mutations)
+  server.tool(
+    'd1_write_query',
+    'Execute a write / mutation SQL query (INSERT, UPDATE, DELETE, CREATE, ALTER, DROP, REPLACE) against a local Cloudflare D1 database. Persists changes to disk.',
+    {
+      database: z
+        .string()
+        .describe('Database identifier: database name, binding name, ID, or direct SQLite file path'),
+      sql: z.string().describe('The write/mutation SQL statement to execute'),
+      search_root: z.string().optional().describe('Optional search root directory to resolve database'),
+    },
+    async ({ database, sql, search_root }) => {
+      try {
+        const roots = search_root ? [search_root] : undefined;
+        const dbInfo = await D1Scanner.findDatabase(database, roots);
+        if (!dbInfo) {
+          return {
+            isError: true,
+            content: [{ type: 'text', text: `Database not found matching: "${database}"` }],
+          };
+        }
+
+        dbManager.openDatabase(dbInfo.filePath);
+        const result = dbManager.executeQuery(sql);
+
+        if (result.error) {
+          return {
+            isError: true,
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    database: dbInfo.name,
+                    sql,
+                    error: result.error,
+                    executionTimeMs: result.executionTimeMs,
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+          };
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  success: true,
+                  database: dbInfo.name,
+                  sql,
+                  rowsAffected: result.rowsAffected,
+                  executionTimeMs: result.executionTimeMs,
+                  message: `Write query executed successfully (${result.rowsAffected} row(s) affected)`,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      } catch (err: any) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `Error executing write query: ${err?.message || String(err)}` }],
         };
       }
     }
