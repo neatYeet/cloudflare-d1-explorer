@@ -221,7 +221,7 @@ export class D1DatabaseManager {
       if (cols.length > 0) {
         const sanitizedSearch = searchQuery.replace(/'/g, "''");
         const conditions = cols.map(
-          (c) => `CAST("${c.name}" AS TEXT) LIKE '%${sanitizedSearch}%'`
+          (c: ColumnInfo) => `CAST("${c.name}" AS TEXT) LIKE '%${sanitizedSearch}%'`
         );
         whereClause = `WHERE ${conditions.join(' OR ')}`;
       }
@@ -255,7 +255,7 @@ export class D1DatabaseManager {
     } else {
       // Fallback columns if table is empty
       const colsInfo = this.getTableStructure(tableName).columns;
-      columns = colsInfo.map((c) => c.name);
+      columns = colsInfo.map((c: ColumnInfo) => c.name);
     }
 
     return {
@@ -318,7 +318,7 @@ export class D1DatabaseManager {
     const columns = Object.keys(rowData);
     const values = Object.values(rowData);
 
-    const colNames = columns.map((c) => `"${c}"`).join(', ');
+    const colNames = columns.map((c: string) => `"${c}"`).join(', ');
     const placeholders = values.map(() => '?').join(', ');
 
     const sql = `INSERT INTO "${tableName}" (${colNames}) VALUES (${placeholders})`;
@@ -430,9 +430,9 @@ export class D1DatabaseManager {
       const rowsRes = this.currentDb.exec(`SELECT * FROM "${t.name}"`);
       if (rowsRes.length && rowsRes[0] && rowsRes[0].values.length) {
         dump += `-- Data for ${t.name}\n`;
-        const cols = rowsRes[0].columns.map((c) => `"${c}"`).join(', ');
+        const cols = rowsRes[0].columns.map((c: string) => `"${c}"`).join(', ');
         for (const row of rowsRes[0].values) {
-          const valStrs = row.map((v) => {
+          const valStrs = row.map((v: any) => {
             if (v === null || v === undefined) return 'NULL';
             if (typeof v === 'number') return String(v);
             return `'${String(v).replace(/'/g, "''")}'`;
